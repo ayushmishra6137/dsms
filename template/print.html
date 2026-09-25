@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="pagehead">
+  <h2>{{ title }}</h2>
+  <button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+</div>
+
+{% if rows %}
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr>{% for key in rows[0].keys() %}<th>{{ key|replace('_',' ')|title }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>{% for key in row.keys() %}<td>{{ row[key] }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">No data found.</p>
+{% endif %}
+{% endblock %}

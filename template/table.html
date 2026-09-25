@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="pagehead">
+  <h2>
+    {% if page == 'stock' %}📦 Current Stock
+    {% elif page == 'sales' %}📋 View Sales
+    {% elif page == 'payments' %}💳 Payment History
+    {% elif page == 'pending' %}💰 Pending Payments
+    {% elif page == 'returns' %}↩️ Return History
+    {% else %}🏭 Purchase History{% endif %}
+  </h2>
+  <a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a>
+</div>
+
+<form class="search search-with-button" method="get">
+  <div class="search-box"><input name="q" value="{{ q or '' }}" placeholder="{% if page == 'returns' %}Search customer, contact, item or bill no.{% else %}Search{% endif %}" autocomplete="off"></div>
+  <button class="search-inside" type="submit">Search</button>
+</form>
+
+<div class="tools">
+  {% if page == 'stock' %}
+    <a class="btn" href="{{ url_for('add_stock') }}">＋ Add Stock</a>
+    <a class="btn secondary" href="{{ url_for('export', kind='stock') }}">⬇️ Export CSV</a>
+  {% elif page == 'sales' %}
+    <a class="btn" href="{{ url_for('export', kind='sales') }}">⬇️ Export CSV</a>
+    <a class="btn secondary" href="{{ url_for('add_sale') }}">＋ Add Sale</a>
+  {% elif page == 'payments' %}
+    <a class="btn" href="{{ url_for('export', kind='payments') }}">⬇️ Export CSV</a>
+  {% elif page == 'pending' %}
+    <a class="btn" href="{{ url_for('export', kind='pending') }}">⬇️ Export CSV</a>
+  {% else %}
+    <a class="btn" href="{{ url_for('export', kind='purchase') }}">⬇️ Export CSV</a>
+    <a class="btn secondary" href="{{ url_for('add_stock') }}">＋ Add Stock</a>
+  {% endif %}
+</div>
+
+<div class="tablewrap list-container">
+<table>
+  <thead>
+    <tr>
+      {% if page == 'stock' %}
+        <th>#</th><th>Supplier</th><th>Contact</th><th>Item</th><th>Qty</th><th>Unit</th><th>Buying</th><th>Selling</th><th>Limit</th><th>Date</th><th>Time</th><th>Actions</th>
+      {% elif page == 'purchase' %}
+        <th>#</th><th>Supplier</th><th>Contact</th><th>Item</th><th>Qty</th><th>Unit</th><th>Total Price</th><th>Date</th><th>Time</th><th>Actions</th>
+      {% elif page == 'sales' %}
+        <th>Date</th><th>Time</th><th>Customer</th><th>Items</th><th>Total</th><th>Paid</th><th>Remaining</th><th>Return Amount</th><th>Actions</th>
+      {% elif page == 'pending' %}
+        <th>Date</th><th>Time</th><th>Customer</th><th>Items</th><th>Pending Amount</th><th>Actions</th>
+      {% elif page == 'returns' %}
+        <th>Date</th><th>Time</th><th>Customer</th><th>Original Items</th><th>Returned Item</th><th>Return Qty</th><th>Unit</th><th>Rate</th><th>Return Amount</th><th>Actions</th>
+      {% else %}
+        <th>Date</th><th>Time</th><th>Customer</th><th>Items</th><th>Total</th><th>Paid</th><th>Payment Method</th><th>Actions</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      {% if page == 'stock' %}
+        <td>{{ loop.index }}</td><td>{{ r['supplier'] }}</td><td>{{ r['supplier_contact'] }}</td>
+        <td class="wrap-cell">{{ r['item'] }}</td><td>{{ r['qty']|trim_zeros }}</td><td>{{ r['unit'] }}</td>
+        <td>₹{{ '%.2f'|format(r['buy_price']) }}</td><td>₹{{ '%.2f'|format(r['sell_price']) }}</td>
+        <td>{{ r['low_limit']|trim_zeros }}</td><td>{{ r['date'] }}</td><td>{{ r['time'] }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-stock-{{ r['id'] }}')">⋮</button>
+          <div class="action-modal" id="modal-stock-{{ r['id'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-stock-{{ r['id'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-stock-{{ r['id'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn primary" href="{{ url_for('current_stock_edit', id=r['id']) }}">Edit</a>
+              <form method="post" action="{{ url_for('current_stock_delete', id=r['id']) }}" onsubmit="return confirmDelete('Delete this current stock entry? Linked purchase/sales history will prevent deletion if needed.')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </td>
+
+      {% elif page == 'purchase' %}
+        <td>{{ loop.index }}</td><td>{{ r['supplier'] }}</td><td>{{ r['supplier_contact'] }}</td>
+        <td class="wrap-cell">{{ r['item'] }}</td><td>{{ r['qty']|trim_zeros }}</td><td>{{ r['unit'] }}</td>
+        <td>₹{{ '%.2f'|format(r['qty'] * r['buy_price']) }}</td><td>{{ r['date'] }}</td><td>{{ r['time'] }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-purchase-{{ r['id'] }}')">⋮</button>
+          <div class="action-modal" id="modal-purchase-{{ r['id'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-purchase-{{ r['id'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-purchase-{{ r['id'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn primary" href="{{ url_for('edit_stock', id=r['id']) }}">Edit</a>
+              <form method="post" action="{{ url_for('delete_stock', id=r['id']) }}" onsubmit="return confirmDelete('Delete this purchase? If it is linked to a sale, the system will keep the history safe and stop the deletion.')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </td>
+
+      {% elif page == 'sales' %}
+        <td>{{ r['date'] }}</td><td>{{ r['time'] }}</td><td>{{ r['customer'] }}</td>
+        <td class="wrap-cell item-list">{{ r['items'].replace(', ', ' • ') }}</td>
+        <td>₹{{ '%.2f'|format(r['total']) }}</td><td>₹{{ '%.2f'|format(r['paid']) }}</td><td>₹{{ '%.2f'|format(r['remaining']) }}</td><td>₹{{ '%.2f'|format(r.get('return_amount', 0)) }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-sales-{{ r['transaction_key'] }}')">⋮</button>
+          <div class="action-modal" id="modal-sales-{{ r['transaction_key'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-sales-{{ r['transaction_key'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-sales-{{ r['transaction_key'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn" href="{{ url_for('bill_view', bill_no=r['bill_no'], date=r['date']) }}">Bill</a>
+              {% if r['remaining'] > 0 %}<a class="btn" href="{{ url_for('pay', id=r['id']) }}">Pay</a>{% endif %}
+              <a class="btn primary" href="{{ url_for('edit_sale', id=r['id']) }}">Edit</a>
+              <a class="btn secondary" href="{{ url_for('return_sale', id=r['id']) }}">Return</a>
+              <form method="post" action="{{ url_for('delete_sale', id=r['id']) }}" onsubmit="return confirmDelete('Delete this entire bill and restore stock?')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </td>
+
+      {% elif page == 'pending' %}
+        <td>{{ r['date'] }}</td><td>{{ r['time'] }}</td><td>{{ r['customer'] }}</td>
+        <td class="wrap-cell item-list">{{ r['items'].replace(', ', ' • ') }}</td><td>₹{{ '%.2f'|format(r['remaining']) }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-pending-{{ r['transaction_key'] }}')">⋮</button>
+          <div class="action-modal" id="modal-pending-{{ r['transaction_key'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-pending-{{ r['transaction_key'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-pending-{{ r['transaction_key'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn" href="{{ url_for('pay', id=r['id']) }}">Pay</a>
+              <a class="btn primary" href="{{ url_for('bill_view', bill_no=r['bill_no'], date=r['date']) }}">Bill</a>
+            </div>
+          </div>
+        </td>
+
+      {% elif page == 'returns' %}
+        <td>{{ r['date'] }}</td><td>{{ r['time'] }}</td><td>{{ r['customer'] }}</td>
+        <td class="wrap-cell item-list">{{ r['original_items'].replace(', ', ' • ') }}</td>
+        <td class="wrap-cell">{{ r['item'] }}</td><td>{{ r['qty']|trim_zeros }}</td><td>{{ r['unit'] }}</td>
+        <td>₹{{ '%.2f'|format(r['original_rate'] or 0) }}</td><td>₹{{ '%.2f'|format(r['amount']) }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-return-{{ r['id'] }}')">⋮</button>
+          <div class="action-modal" id="modal-return-{{ r['id'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-return-{{ r['id'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-return-{{ r['id'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn" href="{{ url_for('bill_view', bill_no=r['bill_no'], date=r['sale_date']) }}">Bill</a>
+            </div>
+          </div>
+        </td>
+
+      {% else %}
+        <td>{{ r['date'] }}</td><td>{{ r['time'] }}</td><td>{{ r['customer'] }}</td>
+        <td class="wrap-cell item-list">{{ r['items'].replace(', ', ' • ') }}</td>
+        <td>₹{{ '%.2f'|format(r['total']) }}</td><td>₹{{ '%.2f'|format(r['amount']) }}</td><td>{{ r['payment_type'] }}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('modal-payment-{{ r['id'] }}')">⋮</button>
+          <div class="action-modal" id="modal-payment-{{ r['id'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('modal-payment-{{ r['id'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('modal-payment-{{ r['id'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn" href="{{ url_for('bill_view', bill_no=r['bill_no'], date=r['date'], payment_id=r['id']) }}">Bill</a>
+              <form method="post" action="{{ url_for('delete_payment', id=r['id']) }}" onsubmit="return confirmDelete('Delete this payment history entry? The bill balance will be restored.')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </td>
+      {% endif %}
+    </tr>
+  {% else %}
+    <tr><td colspan="10" class="empty">{% if page == 'returns' %}No result found.{% else %}No data found.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

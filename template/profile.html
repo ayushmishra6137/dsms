@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+{% if not profile %}
+<section class="auth account-screen">
+  <div class="authbox account-choice-box">
+    <div class="auth-brand first-page-brand">
+      <img src="{{ url_for('static', filename='dsms-logo.svg') }}" alt="DSMS Logo" class="first-page-logo">
+      <div class="first-page-title">Digital Shop Management System</div>
+      <div class="first-page-description">
+        Manage your stock, sales, customers and payments easily in one place
+      </div>
+    </div>
+
+    <div class="auth-choices first-page-actions">
+      <a class="btn primary full" href="{{ url_for('login', next=next_page) }}">🔐 Login Account</a>
+      <a class="btn primary full" href="{{ url_for('signup', next=next_page) }}">✨ Create New Account</a>
+    </div>
+  </div>
+</section>
+{% else %}
+<div class="pagehead"><h2>👤 Profile</h2><a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a></div>
+
+<section class="formbox profile-box">
+  <h3 class="form-title">🏪 Shop Details</h3>
+  <div class="profile-logo-small">
+    {% if profile['logo'] %}<img src="{{ url_for('uploads', name=profile['logo']) }}" alt="Shop Logo">{% else %}<span>No Logo</span>{% endif %}
+  </div>
+  <div class="profile-details">
+    <div><span>Shop Name</span><b>{{ profile['shop_name'] }}</b></div>
+    <div><span>Contact</span><b>{{ profile['contact'] or 'Not added' }}</b></div>
+    <div><span>Address</span><b>{{ profile['address'] or 'Not added' }}</b></div>
+  </div>
+  <a class="btn primary" href="{{ url_for('profile_edit') }}">✏️ Edit Shop Details</a>
+</section>
+
+<section class="formbox profile-box">
+  <h3 class="form-title">🔐 Account Details</h3>
+  <div class="profile-details">
+    <div><span>Username</span><b>{{ profile['username'] }}</b></div>
+    <div><span>Password</span><b>••••••••</b></div>
+  </div>
+  <button class="btn primary" type="button" id="change-password-toggle" onclick="toggleChangePassword()" aria-expanded="false">🔑 Change Password</button>
+</section>
+
+<div class="formbox change-password-box" id="change-password" hidden>
+  <h3 class="form-title">🔑 Change Password</h3>
+  <form method="post" action="{{ url_for('change_password') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Current Password</label><input name="old" type="password" required>
+    <label>New Password <span class="muted-note">(Minimum 8 characters)</span></label><input name="new" type="password" minlength="8" required>
+    <label>Confirm New Password</label><input name="confirm_new" type="password" minlength="8" required>
+    <div class="inline form-actions">
+      <button class="btn primary" type="submit">✓ Change Password</button>
+      <a class="btn secondary back-btn" href="{{ url_for('profile') }}">← Back</a>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- Every form keeps the same compact Back button and clear field spacing. -->
+<div class="pagehead">
+  <h2>
+    {% if page == 'add_stock' %}➕ Add Stock
+    {% elif page == 'edit_stock' %}✏️ Edit Purchase
+    {% elif page == 'edit_current_stock' %}✏️ Edit Current Stock
+    {% elif page == 'edit_stock_price' %}💰 Edit Price
+    {% elif page == 'add_sale' %}🧾 Add Sale
+    {% else %}✏️ Edit Sale{% endif %}
+  </h2>
+  <a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a>
+</div>
+
+<form class="formbox" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="device_date" id="device-date">
+  <input type="hidden" name="device_time" id="device-time">
+
+  {% if page == 'add_stock' %}
+    <!-- Supplier information belongs to the whole batch. -->
+    <label>Supplier Name</label>
+    <input name="supplier" placeholder="Supplier Name">
+
+    <label>Supplier Contact *</label>
+    <input name="supplier_contact" inputmode="numeric" pattern="[0-9]{10}"
+           maxlength="10" placeholder="10 digits" required>
+
+    <h3 class="form-title">📦 Stock Items</h3>
+
+    <!-- JavaScript adds/removes complete stock rows without losing any field. -->
+    <div id="stock-items">
+      <div class="row-item stock-row">
+        <div>
+          <label>Item</label>
+          <input name="item[]" class="stock-item-input" placeholder="Item name" required>
+        </div>
+        <div>
+          <label>Quantity</label>
+          <input name="qty[]" type="number" step="any" min="0.000001" placeholder="0" required>
+        </div>
+        <div>
+          <label>Unit</label>
+          <select name="unit[]" class="stock-unit-select" onchange="toggleStockCustomUnit(this)" required>
+            <option value="">Select unit</option>
+            {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="custom-unit-field hidden-field">
+          <label>Custom Unit</label>
+          <input name="custom_unit[]" placeholder="Custom unit">
+        </div>
+        <div>
+          <label>Buying Price / Unit</label>
+          <input name="buy_price[]" type="number" step="any" min="0" placeholder="0.00">
+        </div>
+        <div>
+          <label>Selling Price / Unit</label>
+          <input name="sell_price[]" type="number" step="any" min="0" placeholder="0.00">
+        </div>
+        <div>
+          <label>Low Stock Limit</label>
+          <input name="low_limit[]" type="number" step="any" min="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn add-item" onclick="addStockRow()">＋ Add Another Item</button>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn primary" type="submit">💾 Save Stock</button>
+      <a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a>
+    </div>
+
+  {% elif page == 'edit_stock_price' %}
+    <label>Item Name</label>
+    <input value="{{ record['item'] }}" readonly>
+    <label>Unit</label>
+    <input value="{{ record['unit'] }}" readonly>
+    <label>Buying Price / Unit</label>
+    <input name="buy_price" type="number" step="any" min="0" value="{{ record['buy_price'] }}" required>
+    <label>Selling Price / Unit</label>
+    <input name="sell_price" type="number" step="any" min="0" value="{{ record['sell_price'] }}" required>
+    <p class="muted">Only the current stock prices will change. Existing bills and sales history keep their original rates.</p>
+    <div class="form-actions">
+      <button class="btn primary" type="submit">💾 Save Price</button>
+      <a class="btn secondary back-btn" href="{{ url_for('stock_report') }}">← Back</a>
+    </div>
+
+  {% elif page in ['edit_stock', 'edit_current_stock'] %}
+    <label>Supplier Name</label>
+    <input name="supplier" value="{{ record['supplier'] }}">
+
+    <label>Supplier Contact *</label>
+    <input name="supplier_contact" value="{{ record['supplier_contact'] }}"
+           inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required>
+
+    <label>Item Name *</label>
+    <input name="item" value="{{ record['item'] }}" required>
+
+    <label>Quantity *</label>
+    <input name="qty" type="number" step="any" min="0.000001" value="{{ record['qty'] }}" required>
+
+    <label>Unit *</label>
+    <select name="unit" id="stock-unit" onchange="toggleCustomUnit()" required>
+      {% for u in units %}
+        <option value="{{ u }}" {% if record['unit'] == u %}selected{% endif %}>{{ u }}</option>
+      {% endfor %}
+    </select>
+    <div id="custom-unit-box" class="hidden-field">
+      <label>Custom Unit</label>
+      <input name="custom_unit" value="{{ record['unit'] if record['unit'] not in units else '' }}">
+    </div>
+
+    <label>Buying Price / Unit</label>
+    <input name="buy_price" type="number" step="any" min="0" value="{{ record['buy_price'] }}">
+
+    <label>Selling Price / Unit</label>
+    <input name="sell_price" type="number" step="any" min="0" value="{{ record['sell_price'] }}">
+
+    <label>Low Stock Limit</label>
+    <input name="low_limit" type="number" step="any" min="0" value="{{ record['low_limit'] }}">
+
+    <div class="form-actions">
+      <button class="btn primary" type="submit">💾 {% if page == 'edit_current_stock' %}Update Stock{% else %}Save Changes{% endif %}</button>
+      <a class="btn secondary back-btn" href="{{ url_for('stock' if page == 'edit_current_stock' else 'purchase_history') }}">← Back</a>
+    </div>
+
+  {% elif page == 'edit_sale' %}
+    <label>Customer *</label>
+    <input name="customer" value="{{ record['customer'] }}" required>
+
+    <label>Customer contact *</label>
+    <input name="contact" value="{{ record['contact'] }}" inputmode="numeric"
+           pattern="[0-9]{10}" maxlength="10" required>
+
+    <h3 class="form-title">🛒 Edit Sale Items</h3>
+    <p class="muted">Edit item, unit, quantity and rate like Add Sale. Lines that already have a return keep their original item/unit/rate so return history remains accurate; their quantity can still be adjusted above the returned quantity.</p>
+
+    <div id="sale-items"
+         data-search-placeholder="Search item"
+         data-no-item="No item found"
+         data-select-item="Select item"
+         data-available-label="Available Stock"
+         data-select-unit="Select unit">
+      {% for r in record_items %}
+      <div class="row-item sale-row">
+        <input type="hidden" name="sale_line_id[]" value="{{ r['id'] }}">
+        <div class="field-item">
+          <label>Item</label>
+          <select name="item[]" class="item-select" {% if r['locked'] %}disabled{% endif %} required>
+            <option value="">Select item</option>
+            {% for x in items %}
+              <option value="{{ x['item'] }}"
+                      data-stock-unit="{{ x['unit'] }}"
+                      data-stock-qty="{{ x['qty'] }}"
+                      data-price="{{ x['price'] }}"
+                      data-family="{{ x['family'] }}"
+                      data-units="{{ x['units']|join('|') }}"
+                      {% if x['item'] == r['item'] %}selected{% endif %}>{{ x['item'] }}</option>
+            {% endfor %}
+          </select>
+          {% if r['locked'] %}<input type="hidden" name="item[]" value="{{ r['item'] }}">{% endif %}
+        </div>
+        <div class="field-unit">
+          <label>Unit</label>
+          <select name="unit[]" class="unit-select" {% if r['locked'] %}disabled{% endif %} required>
+            {% for u in r['units'] %}<option value="{{ u }}" {% if u == r['unit'] %}selected{% endif %}>{{ u }}</option>{% endfor %}
+          </select>
+          {% if r['locked'] %}<input type="hidden" name="unit[]" value="{{ r['unit'] }}">{% endif %}
+        </div>
+        <div>
+          <label>Qty</label>
+          <input class="qty-input" name="qty[]" type="number" step="any" min="0.000001" value="{{ r['qty'] }}" required>
+        </div>
+        <div>
+          <label>Rate</label>
+          <input class="price-input" name="price[]" type="number" step="any" value="{{ r['price'] }}" {% if r['locked'] %}readonly{% else %}readonly{% endif %}>
+        </div>
+        <div class="line-total-field">
+          <label>Total</label>
+          <input class="line-total" value="{{ '%.2f'|format(r['total']) }}" readonly>
+        </div>
+        {% if not r['locked'] %}<button type="button" class="remove-item" onclick="removeSaleRow(this)" aria-label="Remove item">×</button>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn add-item" onclick="addSaleRow()">＋ Add Another Item</button>
+    </div>
+
+    <div class="summary-box">
+      <label>Grand Total</label>
+      <input id="grand-total" value="0.00" readonly>
+
+      <label>Paid Amount</label>
+      <input name="paid" id="paid" type="number" step="any" min="0" value="{{ '%.2f'|format(paid_total) }}" oninput="calcSaleTotal()">
+
+      <label>Payment Method</label>
+      <div class="payment-methods">
+        <label class="payment-option"><input type="radio" name="payment_type" value="Cash" {% if payment_type == 'Cash' %}checked{% endif %}> Cash</label>
+        <label class="payment-option"><input type="radio" name="payment_type" value="Online" {% if payment_type == 'Online' %}checked{% endif %}> Online</label>
+      </div>
+
+      <label>Remaining Amount</label>
+      <input id="remaining" value="0.00" readonly>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn primary" type="submit">💾 Save Changes &amp; Show Bill</button>
+      <a class="btn secondary back-btn" href="{{ url_for('sales') }}">← Back</a>
+    </div>
+
+  {% else %}
+    <label>Customer *</label>
+    <input name="customer" placeholder="Customer name" required>
+
+    <label>Customer contact *</label>
+    <input name="contact" inputmode="numeric" pattern="[0-9]{10}" maxlength="10"
+           placeholder="10 digits" required>
+
+    <h3 class="form-title">🛒 Items</h3>
+    <div id="sale-items"
+         data-search-placeholder="Search item"
+         data-no-item="No item found"
+         data-select-item="Select item"
+         data-available-label="Available Stock"
+         data-select-unit="Select unit">
+
+      <!-- The first sale row is the template used by Add Another Item. -->
+      <div class="row-item sale-row">
+        <div class="field-item">
+          <label>Item</label>
+          <select name="item[]" class="item-select" required>
+            <option value="">Select item</option>
+            {% for x in items %}
+              <option value="{{ x['item'] }}"
+                      data-stock-unit="{{ x['unit'] }}"
+                      data-stock-qty="{{ x['qty'] }}"
+                      data-price="{{ x['price'] }}"
+                      data-family="{{ x['family'] }}"
+                      data-units="{{ x['units']|join('|') }}">{{ x['item'] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field-unit">
+          <label>Unit</label>
+          <select name="unit[]" class="unit-select" required>
+            <option value="">Select unit</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Qty</label>
+          <input class="qty-input" name="qty[]" type="number" step="any" min="0.000001" required>
+        </div>
+
+        <div>
+          <label>Rate</label>
+          <input class="price-input" name="price[]" type="number" step="any" readonly>
+        </div>
+
+        <div class="line-total-field">
+          <label>Total</label>
+          <input class="line-total" value="0.00" readonly>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn add-item" onclick="addSaleRow()">＋ Add Another Item</button>
+    </div>
+
+    <div class="summary-box">
+      <label>Grand Total</label>
+      <input id="grand-total" value="0.00" readonly>
+
+      <label>Paid Amount</label>
+      <input name="paid" id="paid" type="number" step="any" min="0" value="0" oninput="calcSaleTotal()">
+
+      <label>Payment Method</label>
+      <div class="payment-methods">
+        <label class="payment-option"><input type="radio" name="payment_type" value="Cash" checked> Cash</label>
+        <label class="payment-option"><input type="radio" name="payment_type" value="Online"> Online</label>
+      </div>
+
+      <label>Remaining Amount</label>
+      <input id="remaining" value="0.00" readonly>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn primary" type="submit">💾 Save &amp; Show Bill</button>
+      <a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a>
+    </div>
+  {% endif %}
+</form>
+{% endblock %}
