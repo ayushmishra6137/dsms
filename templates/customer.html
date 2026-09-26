@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="pagehead"><h2>👤 Customer History</h2><a class="btn secondary back-btn" href="{{ url_for('home') }}">← Back</a></div>
+
+<form class="search search-with-button" method="get">
+  <div class="search-box"><input name="q" value="{{ q or '' }}" placeholder="Search Customer" autocomplete="off"></div>
+  <button class="search-inside" type="submit">Search</button>
+</form>
+
+<div class="history-filter">
+  <form method="get" class="date-filter-form">
+    <input type="hidden" name="q" value="{{ q or '' }}">
+    <label>📅 View Date</label>
+    <input type="date" name="date" value="{{ date_filter }}">
+    <button class="btn secondary" type="submit">Show Date</button>
+    {% if q %}<a class="btn secondary" href="{{ url_for('customer_history') }}">Today</a>{% endif %}
+  </form>
+</div>
+
+<div class="tablewrap list-container">
+  <table class="responsive-table customer-table">
+    <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Items</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r['date'] }}</td>
+        <td>{{ r['time'] }}</td>
+        <td>{{ r['customer'] }}</td>
+        <td class="wrap-cell item-list">{{ r['items'].replace(', ', ' • ') }}</td>
+        <td>₹{{ '%.2f'|format(r['total']) }}</td>
+        <td>{% if r['remaining'] <= 0.000001 %}Paid{% else %}Remaining{% endif %}</td>
+        <td class="actions">
+          <button class="dot-action" type="button" onclick="openActionModal('customer-modal-{{ r['transaction_key'] }}')">⋮</button>
+          <div class="action-modal" id="customer-modal-{{ r['transaction_key'] }}" hidden>
+            <div class="action-backdrop" onclick="closeActionModal('customer-modal-{{ r['transaction_key'] }}')"></div>
+            <div class="action-dialog">
+              <button class="modal-close" type="button" onclick="closeActionModal('customer-modal-{{ r['transaction_key'] }}')">×</button>
+              <h3>Actions</h3>
+              <a class="btn" href="{{ url_for('bill_view', bill_no=r['bill_no'], date=r['date']) }}">Bill</a>
+              <form method="post" action="{{ url_for('delete_sale', id=r['id']) }}" onsubmit="return confirmDelete('Delete this transaction and restore stock?')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">No customer transactions found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
